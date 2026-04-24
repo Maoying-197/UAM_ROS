@@ -1,39 +1,46 @@
 <?xml version="1.0"?>
 
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:arg name="hw_plugin" default="my_arm_hardware/MyArmSystem"/>
-    <!-- <plugin>mock_components/GenericSystem</plugin> -->
-    <xacro:arg name="serial_port" default="/dev/ttyUSB0"/>
-    <xacro:arg name="baudrate" default="115200"/>
-
+    <!-- Set use_sim:=true to load the MuJoCo simulation backend instead of real hardware -->
+    <xacro:arg name="use_sim" default="false"/>
+    <!-- Optional: override the MJCF model path used by the MuJoCo backend -->
+    <xacro:arg name="mujoco_model_path" default="$(find mujoco_arm_hardware)/mujoco/arm.xml"/>
 
     <xacro:macro name="arm_ros2_control" params="name initial_positions_file">
         <xacro:property name="initial_positions" value="${xacro.load_yaml(initial_positions_file)['initial_positions']}"/>
 
-        <!-- <xacro:arg name="hw_plugin" default="mock_components/GenericSystem"/> -->
         <ros2_control name="${name}" type="system">
             <hardware>
-                <!-- By default, set up controllers for simulation. This won't work on real hardware -->
-                <!-- <plugin>mock_components/GenericSystem</plugin> -->
-                
-                <plugin>my_arm_hardware/MyArmHardware</plugin>
-                <param name="serial_port">/dev/ttyUSB4</param>
-                <param name="reader_port">/dev/ttyUSB5</param>
-                <param name="gripper_port">/dev/ttyUSB6</param>
-                <param name="baudrate">230400</param>
-                <param name="gripper_baudrate">115200</param>
-                <param name="position_scale">1000</param> 
-                <param name="hw_slowdown">10</param>
-                <param name="initial_read_timeout_sec">2.0</param>
-                <param name="enable_feedback_plot">true</param>
-                <param name="feedback_plot_rate_hz">100</param>
-                <param name="feedback_plot_min_rad">-1.</param>
-                <param name="feedback_plot_max_rad">1.</param>
-                <param name="feedback_plot_joint_filter">joint1,joint2,joint3</param>
-                <param name="feedback_plot_csv_enabled">true</param>
-                <param name="feedback_plot_csv_file">/tmp/joint_monitor.csv</param>
-                <param name="feedback_plot_csv_append">false</param>
+                <!-- ── Simulation backend (MuJoCo) ─────────────────────────────── -->
+                <xacro:if value="$(arg use_sim)">
+                    <plugin>mujoco_arm_hardware/MujocoArmHardware</plugin>
+                    <param name="model_path">$(arg mujoco_model_path)</param>
+                    <!-- Number of MuJoCo steps per ros2_control update cycle.
+                         With MJCF timestep=0.002 s and update_rate=100 Hz (0.01 s cycle),
+                         n_substeps=5 keeps the simulation running in real-time. -->
+                    <param name="n_substeps">5</param>
+                </xacro:if>
 
+                <!-- ── Real hardware backend (serial) ─────────────────────────── -->
+                <xacro:unless value="$(arg use_sim)">
+                    <plugin>my_arm_hardware/MyArmHardware</plugin>
+                    <param name="serial_port">/dev/ttyUSB4</param>
+                    <param name="reader_port">/dev/ttyUSB5</param>
+                    <param name="gripper_port">/dev/ttyUSB6</param>
+                    <param name="baudrate">230400</param>
+                    <param name="gripper_baudrate">115200</param>
+                    <param name="position_scale">1000</param>
+                    <param name="hw_slowdown">10</param>
+                    <param name="initial_read_timeout_sec">2.0</param>
+                    <param name="enable_feedback_plot">true</param>
+                    <param name="feedback_plot_rate_hz">100</param>
+                    <param name="feedback_plot_min_rad">-1.</param>
+                    <param name="feedback_plot_max_rad">1.</param>
+                    <param name="feedback_plot_joint_filter">joint1,joint2,joint3</param>
+                    <param name="feedback_plot_csv_enabled">true</param>
+                    <param name="feedback_plot_csv_file">/tmp/joint_monitor.csv</param>
+                    <param name="feedback_plot_csv_append">false</param>
+                </xacro:unless>
             </hardware>
             <joint name="joint1">
                 <command_interface name="position"/>
