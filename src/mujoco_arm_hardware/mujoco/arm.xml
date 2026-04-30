@@ -1,0 +1,263 @@
+<!--
+  MuJoCo MJCF model for the 7-DOF UAM arm.
+
+  Kinematic structure (matches arm.urdf):
+    world → uav_mount (fixed)
+           → base_link  (fixed, rotated 180° about X to match URDF uav_arm_mount)
+             → joint1 (revolute, z, −1.57..1.57)
+               → joint2 (revolute, z, 0..3.14)
+                 → joint3 (revolute, z, −3.14..0)
+                   → joint4 (revolute, z, −3.14..3.14)
+                     → joint5 (revolute, z, 0..3.14)
+                       → joint6 (revolute, z, −3.14..3.14)
+                         → joint7 (revolute, −z, −0.69..0)  [gripper]
+                         → tool0  (site, fixed TCP)
+
+  Actuators:  one position-servo per joint, named "act_jointN".
+  The hardware plugin (MujocoArmHardware) looks up actuators by the convention
+  "act_<joint_name>", so the names here must match exactly.
+
+  Simulation timestep: 0.002 s
+  Recommended n_substeps in ros2_control xacro: 5  (5 × 0.002 = 0.010 s = 100 Hz)
+
+  Geometry: simple capsule/box shapes for approximate collision.
+  Replace with mesh assets if exact geometry is needed.
+
+  Inertia values are taken directly from the URDF SolidWorks export.
+-->
+
+<mujoco model="arm">
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- Compiler & solver settings                                              -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <compiler angle="radian" autolimits="true"/>
+
+  <option
+    timestep="0.002"
+    gravity="0 0 -9.81"
+    integrator="RK4"/>
+
+  <size njmax="500" nconmax="100"/>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- Defaults                                                                -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <default>
+    <!-- Joint damping provides velocity-dependent braking (simulates motor friction).
+         Increase for smoother motion; decrease if joints feel sluggish. -->
+    <joint damping="0.3" armature="0.01"/>
+
+    <geom contype="1" conaffinity="1"
+          rgba="0.79 0.82 0.93 1"
+          condim="3" friction="0.8 0.1 0.1"/>
+  </default>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- World body                                                              -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <worldbody>
+
+    <!-- Ground plane (visual reference) -->
+    <geom name="ground" type="plane" size="2 2 0.01"
+          rgba="0.3 0.3 0.3 1" contype="1" conaffinity="1"/>
+
+    <!--
+      uav_mount: robot root, elevated 0.5 m above ground for clearance.
+      Change pos to place the arm at the desired world position.
+    -->
+    <body name="uav_mount" pos="0 0 0.5">
+
+      <!--
+        base_link: URDF joint "uav_arm_mount" is fixed with
+        origin rpy="3.14159265359 0 0"  (180° about X → flip Z).
+      -->
+      <body name="base_link" pos="0 0 0" euler="3.14159265359 0 0">
+        <inertial
+          pos="-0.033824 -0.006245 0.012700"
+          mass="0.133986"
+          fullinertia="9.069e-05 9.474e-05 1.841e-04 -7.758e-07 7.005e-12 2.206e-12"/>
+        <geom name="base_link_geom" type="box" size="0.04 0.04 0.015"/>
+
+        <!--
+          link1
+          URDF joint1: origin xyz="0 0 0.03", rpy="0 0 0", axis z
+          Limits: −1.57 .. 1.57 rad
+        -->
+        <body name="link1" pos="0 0 0.03">
+          <joint name="joint1" type="hinge" axis="0 0 1"
+                 range="-1.57 1.57" ref="0"/>
+          <inertial
+            pos="5.818e-06 0.003031 0.069561"
+            mass="0.642479"
+            fullinertia="6.134e-04 1.010e-03 6.209e-04 -5.835e-09 2.627e-08 8.486e-08"/>
+          <!-- Shoulder capsule: roughly 75 mm long along Z -->
+          <geom name="link1_geom" type="capsule"
+                fromto="0 0 0 0 0 0.075" size="0.025"/>
+
+          <!--
+            link2
+            URDF joint2: origin xyz="0 0.052 0.075", rpy="-1.5708 0 0", axis z
+            Limits: 0 .. 3.14 rad
+          -->
+          <body name="link2" pos="0 0.052 0.075" euler="-1.5708 0 0">
+            <joint name="joint2" type="hinge" axis="0 0 1"
+                   range="0 3.14" ref="0"/>
+            <inertial
+              pos="-0.440299 0.026862 -0.012437"
+              mass="0.433727"
+              fullinertia="1.362e-04 6.122e-03 6.188e-03 1.095e-04 -1.669e-07 6.102e-08"/>
+            <!-- Upper arm: 600 mm along −X after frame rotation -->
+            <geom name="link2_geom" type="capsule"
+                  fromto="0 0 0 -0.60 0 0" size="0.022"/>
+
+            <!--
+              link3
+              URDF joint3: origin xyz="-0.6 0 0.013", rpy="0 0 0", axis z
+              Limits: −3.14 .. 0 rad
+            -->
+            <body name="link3" pos="-0.6 0 0.013">
+              <joint name="joint3" type="hinge" axis="0 0 1"
+                     range="-3.14 0" ref="0"/>
+              <inertial
+                pos="0.164567 -0.034293 -0.006985"
+                mass="0.079708"
+                fullinertia="1.823e-05 3.872e-04 3.988e-04 3.750e-06 9.790e-14 -2.580e-09"/>
+              <!-- Forearm: 505 mm along +X -->
+              <geom name="link3_geom" type="capsule"
+                    fromto="0 0 0 0.505 0 0" size="0.018"/>
+
+              <!--
+                link4
+                URDF joint4: origin xyz="0.5049 -0.046123 -0.0075",
+                             rpy="1.5708 1.5277 1.5686", axis z
+                Limits: −3.14 .. 3.14 rad
+              -->
+              <body name="link4"
+                    pos="0.5049 -0.046123 -0.0075"
+                    euler="1.5708 1.5277 1.5686">
+                <joint name="joint4" type="hinge" axis="0 0 1"
+                       range="-3.14 3.14" ref="0"/>
+                <inertial
+                  pos="-0.001650 8.374e-05 0.028246"
+                  mass="0.063703"
+                  fullinertia="1.740e-05 1.268e-05 1.283e-05 -7.976e-09 -2.246e-09 3.360e-10"/>
+                <!-- Wrist-1 link -->
+                <geom name="link4_geom" type="capsule"
+                      fromto="0 0 0 0 0 0.03" size="0.015"/>
+
+                <!--
+                  link5
+                  URDF joint5: origin xyz="-0.021 0 0.03",
+                               rpy="-1.5708 -1.5686 1.5277", axis z
+                  Limits: 0 .. 3.14 rad
+                -->
+                <body name="link5"
+                      pos="-0.021 0 0.03"
+                      euler="-1.5708 -1.5686 1.5277">
+                  <joint name="joint5" type="hinge" axis="0 0 1"
+                         range="0 3.14" ref="0"/>
+                  <inertial
+                    pos="-6.027e-05 -0.026829 0.005488"
+                    mass="0.054736"
+                    fullinertia="9.622e-06 1.135e-05 7.932e-06 3.523e-09 3.127e-10 1.470e-07"/>
+                  <!-- Wrist-2 link -->
+                  <geom name="link5_geom" type="capsule"
+                        fromto="0 0 0 0 -0.049 0" size="0.013"/>
+
+                  <!--
+                    link6
+                    URDF joint6: origin xyz="-0.00010793 -0.048549 -0.023114",
+                                 rpy="1.5708 0 0", axis z
+                    Limits: −3.14 .. 3.14 rad
+                  -->
+                  <body name="link6"
+                        pos="-0.00010793 -0.048549 -0.023114"
+                        euler="1.5708 0 0">
+                    <joint name="joint6" type="hinge" axis="0 0 1"
+                           range="-3.14 3.14" ref="0"/>
+                    <inertial
+                      pos="-0.001814 2.700e-04 0.046145"
+                      mass="0.052846"
+                      fullinertia="2.762e-05 2.921e-05 8.155e-06 -1.284e-08 -5.525e-07 -7.609e-07"/>
+                    <!-- End-of-arm / tool flange -->
+                    <geom name="link6_geom" type="capsule"
+                          fromto="0 0 0 0 0 0.088" size="0.013"/>
+
+                    <!-- TCP site (tool0 frame) — matches URDF tool0_fixed joint:
+                         xyz="-0.02 0 0.15" rpy="0 -0.3 0" relative to link6 -->
+                    <site name="tool0"
+                          pos="-0.02 0 0.15"
+                          euler="0 -0.3 0"
+                          size="0.008"
+                          rgba="1 0.2 0.2 1"/>
+
+                    <!--
+                      link7 (gripper)
+                      URDF joint7: origin xyz="-0.023246 0.0041998 0.088212",
+                                   rpy="-1.5708 0 0", axis xyz="0 0 -1"
+                      Limits: −0.69 .. 0 rad
+                    -->
+                    <body name="link7"
+                          pos="-0.023246 0.0041998 0.088212"
+                          euler="-1.5708 0 0">
+                      <joint name="joint7" type="hinge" axis="0 0 -1"
+                             range="-0.69 0" ref="0"/>
+                      <inertial
+                        pos="-0.012374 -0.029856 -0.0041787"
+                        mass="0.0072621"
+                        fullinertia="3.318e-06 2.307e-06 5.556e-06 -2.165e-06 -8.835e-08 -1.285e-07"/>
+                      <!-- Gripper finger block -->
+                      <geom name="link7_geom" type="box"
+                            size="0.015 0.020 0.010"
+                            rgba="0.4 0.4 0.8 1"/>
+                    </body> <!-- link7 -->
+
+                  </body> <!-- link6 -->
+                </body> <!-- link5 -->
+              </body> <!-- link4 -->
+            </body> <!-- link3 -->
+          </body> <!-- link2 -->
+        </body> <!-- link1 -->
+      </body> <!-- base_link -->
+    </body> <!-- uav_mount -->
+  </worldbody>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- Position-servo actuators                                                -->
+  <!--                                                                         -->
+  <!-- kp  : position gain (N·m / rad).  Increase for stiffer response.       -->
+  <!-- The joint's "damping" attribute (set in <default>) acts as kd.          -->
+  <!-- Together they form a PD controller: τ = kp*(q_d − q) − kd*q̇           -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <actuator>
+    <!-- joint1: shoulder yaw  − heavy, needs higher gain -->
+    <position name="act_joint1" joint="joint1"
+              kp="300" ctrlrange="-1.57 1.57"/>
+
+    <!-- joint2: shoulder pitch − carries full arm weight -->
+    <position name="act_joint2" joint="joint2"
+              kp="300" ctrlrange="0 3.14"/>
+
+    <!-- joint3: elbow -->
+    <position name="act_joint3" joint="joint3"
+              kp="200" ctrlrange="-3.14 0"/>
+
+    <!-- joint4: wrist-1 -->
+    <position name="act_joint4" joint="joint4"
+              kp="150" ctrlrange="-3.14 3.14"/>
+
+    <!-- joint5: wrist-2 -->
+    <position name="act_joint5" joint="joint5"
+              kp="150" ctrlrange="0 3.14"/>
+
+    <!-- joint6: wrist-3 (tool rotation) -->
+    <position name="act_joint6" joint="joint6"
+              kp="100" ctrlrange="-3.14 3.14"/>
+
+    <!-- joint7: gripper finger -->
+    <position name="act_joint7" joint="joint7"
+              kp="50" ctrlrange="-0.69 0"/>
+  </actuator>
+
+</mujoco>

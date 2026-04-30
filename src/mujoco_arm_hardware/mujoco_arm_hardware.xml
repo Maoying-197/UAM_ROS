@@ -1,0 +1,11 @@
+<library path="mujoco_arm_hardware">
+  <class name="mujoco_arm_hardware/MujocoArmHardware"
+         type="mujoco_arm_hardware::MujocoArmHardware"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      ros2_control SystemInterface backed by the MuJoCo physics simulator.
+      Supports position-commanded, position/velocity-sensed joints for the
+      7-DOF arm (joint1–joint7 including gripper joint7).
+    </description>
+  </class>
+</library>
